@@ -1,0 +1,269 @@
+SELECT COUNT(*)  FROM `project-leducthinh-2024.DA04_K300.iris` LIMIT 1000
+-- 150
+
+-- Tìm k
+-- k= log10(150 mẫu) = 2.17 >>> k=2, k=3
+
+
+
+
+SELECT *  FROM `project-leducthinh-2024.DA04_K300.iris` LIMIT 1000
+  -- "Id": "99",
+  -- "SepalLengthCm": "5.1",
+  -- "SepalWidthCm": "2.5",
+  -- "PetalLengthCm": "3.0",
+  -- "PetalWidthCm": "1.1",
+  -- "Species": "Iris-versicolor"
+
+
+
+  CREATE OR REPLACE TABLE `project-leducthinh-2024.DA04_K300.iris_new` AS
+SELECT *,
+  CASE
+    WHEN split_field <= 0.8 THEN 'training'
+    ELSE 'evaluation'
+  END AS split_dataframe
+FROM (
+  SELECT *, ROUND(ABS(RAND()), 3) AS split_field
+  FROM `project-leducthinh-2024.DA04_K300.iris`
+);
+
+
+-- Xem table 80-20
+SELECT * FROM `project-leducthinh-2024.DA04_K300.iris_new`
+
+
+-- B1. CREATE MODEL
+CREATE OR REPLACE MODEL `project-leducthinh-2024.DA04_K300.iris_logistic_model`
+OPTIONS(MODEL_TYPE = 'LOGISTIC_REG',
+        INPUT_LABEL_COLS = ['Species']) 
+AS
+SELECT 
+  SepalLengthCm,
+  SepalWidthCm,
+  PetalLengthCm,
+  PetalWidthCm,
+  Species
+FROM `project-leducthinh-2024.DA04_K300.iris_new`
+WHERE split_dataframe = 'training';
+
+-- KQ SAU KHI CREATE MODEL:
+
+-- Precision - Độ chính xác: 0.9855 >>> 98.55% thuộc lớp đúng. >>> mô hình ít dự đoán sai.
+
+-- Recall - Khả năng phát hiện: 0.9845. >>> 98.45% được mô hình nhận diện chính xác. >>> Recall cao >>> mô hình ít bỏ sót các trường hợp đúng.
+
+-- Accuracy (Độ chính xác tổng thể): 0.9837. >>> 98.37% >>> dự đoán của mô hình chính xác.
+
+-- F1 score: 0.9847. >>> Là trung bình điều hòa giữa Precision và Recall.>>> F1 score gần 1 >>> cân bằng tốt giữa Precision và Recall.
+
+-- Log loss: 0.0784. >>> Giá trị thấp >>> mô hình dự đoán xác suất tốt.
+
+-- ROC AUC - Diện tích dưới đường cong ROC: 1.0000 >>> ROC AUC đạt 1.0 là lý tưởng, >>> mô hình có khả năng phân loại hoàn hảo.
+
+
+
+
+
+
+
+-- B2. EVALUATE
+SELECT *
+FROM ML.EVALUATE(
+  MODEL `project-leducthinh-2024.DA04_K300.iris_logistic_model`,
+  (
+    SELECT 
+      SepalLengthCm,
+      SepalWidthCm,
+      PetalLengthCm,
+      PetalWidthCm,
+      Species
+    FROM `project-leducthinh-2024.DA04_K300.iris_new`
+    WHERE split_dataframe = 'evaluation'
+  )
+);
+
+-- Precision - Độ chính xác: 0.8968. >>> 89.68% thực sự thuộc lớp chính xác.
+-- Recall - Khả năng phát hiện: 0.8968. >>>  89.68% mô hình nhận diện chính xác.
+-- Accuracy (Độ chính xác tổng thể): 0.9259. >>> 92.59% dự đoán của mô hình là chính xác trên tập kiểm tra.
+-- F1 Score: 0.8968. >>> F1 Score gần với Precision và Recall >>>  giảm dự đoán sai và không bỏ sót.
+-- Log Loss: 0.1682. >>> giá trị càng gần 0 càng tốt.
+-- ROC AUC: 0.9932 >>> giá trị càng gần 1 càng tốt.
+
+
+
+
+SELECT *
+FROM ML.CONFUSION_MATRIX(MODEL `project-leducthinh-2024.DA04_K300.iris_logistic_model`);
+
+-- Iris-setosa:
+-- Dự đoán đúng: 36/36 (100%).
+-- Không có nhầm lẫn với các loại khác → Mô hình phân loại rất tốt cho Iris-setosa.
+
+-- Iris-virginica:
+-- Dự đoán đúng: 44/44 (100%).
+-- Không có nhầm lẫn với các loại khác.
+
+-- Iris-versicolor:
+-- Dự đoán đúng: 41/43 (95.35%).
+-- Nhầm lẫn 2 trường hợp thành Iris-virginica.
+
+-- => Vấn đề CẦN cải thiện: Giảm nhầm lẫn giữa Iris-versicolor và Iris-virginica.
+
+
+
+-- Kiểm tra avg và độ lệch chuẩn
+SELECT 
+  Species,
+  AVG(PetalLengthCm) AS avg_petal_length,
+  STDDEV(PetalLengthCm) AS stddev_petal_length,
+  AVG(PetalWidthCm) AS avg_petal_width,
+  STDDEV(PetalWidthCm) AS stddev_petal_width
+FROM `project-leducthinh-2024.DA04_K300.iris_new`
+WHERE Species IN ('Iris-versicolor', 'Iris-virginica')
+GROUP BY Species;
+
+
+-- Petal Length:
+    -- Iris-virginica:
+        -- Trung bình: 5.552
+        -- Độ lệch chuẩn: 0.552
+        
+    -- Iris-versicolor:
+        -- Trung bình: 4.26
+        -- Độ lệch chuẩn: 0.470
+
+
+
+-- Có sự khác biệt rõ ràng giữa trung bình chiều dài cánh hoa của hai loại.
+-- Độ lệch chuẩn nhỏ (≈ 0.5) cho thấy phân phối dữ liệu của cả hai loại hoa khá ổn định, ít bị ảnh hưởng bởi outliers.
+
+
+
+-- Petal Width:
+    -- Iris-virginica:
+        -- Trung bình: 2.026
+        -- Độ lệch chuẩn: 0.275
+    -- Iris-versicolor:
+        -- Trung bình: 1.326
+        -- Độ lệch chuẩn: 0.198
+
+-- Có sự khác biệt rõ ràng về trung bình chiều rộng cánh hoa giữa hai loại.
+-- Độ lệch chuẩn nhỏ (≈ 0.2) cho thấy phân phối dữ liệu ổn định.
+
+
+
+
+
+-- ROUND 2: Cải thiện thêm khả năng phân loại
+CREATE OR REPLACE TABLE `project-leducthinh-2024.DA04_K300.iris_interaction` AS
+SELECT *,
+  PetalLengthCm * PetalWidthCm AS PetalArea
+FROM `project-leducthinh-2024.DA04_K300.iris_new`;
+
+--  TRAIN LẠI
+CREATE OR REPLACE MODEL `project-leducthinh-2024.DA04_K300.iris_logistic_model_improved`
+OPTIONS(MODEL_TYPE = 'LOGISTIC_REG',
+        INPUT_LABEL_COLS = ['Species']) 
+AS
+SELECT 
+  SepalLengthCm,
+  SepalWidthCm,
+  PetalLengthCm,
+  PetalWidthCm,
+  PetalArea,
+  Species
+FROM `project-leducthinh-2024.DA04_K300.iris_interaction`
+WHERE split_dataframe = 'training';
+
+
+-- KQ:
+-- Precision 0.9926
+-- Recall 0.9922
+-- Accuracy 0.9919
+-- F1 score 0.9923
+-- Log loss 0.0603
+-- ROC AUC 1.0000
+
+
+
+
+-- So với MODEL lần trước: -- Cải thiện rõ rệt, đặc biệt trong việc giảm nhầm lẫn giữa các lớp (Iris-versicolor và Iris-virginica).
+
+
+-- Precision tăng từ 0.9855 lên 0.9926.
+-- Recall tăng từ 0.9845 lên 0.9922.
+-- Accuracy tăng từ 0.9837 lên 0.9919.
+-- Log Loss giảm từ 0.0784 xuống 0.0603.
+-- ROC AUC vẫn đạt 1.0000.
+
+
+
+-- EVALUATE
+SELECT *
+FROM ML.EVALUATE(
+  MODEL `project-leducthinh-2024.DA04_K300.iris_logistic_model_improved`,
+  (
+    SELECT 
+      SepalLengthCm,
+      SepalWidthCm,
+      PetalLengthCm,
+      PetalWidthCm,
+      PetalArea,
+      Species
+    FROM `project-leducthinh-2024.DA04_K300.iris_interaction`
+    WHERE split_dataframe = 'evaluation'
+  )
+);
+
+  -- "precision": "0.89682539682539686",
+  -- "recall": "0.89682539682539686",
+  -- "accuracy": "0.92592592592592582",
+  -- "f1_score": "0.89682539682539686",
+  -- "log_loss": "0.157872096140111",
+  -- "roc_auc": "0.99323543123543123"
+
+-- Hiệu suất mô hình vẫn tốt (ROC AUC gần 1 và Log Loss thấp).
+-- Precision, Recall và F1 Score giảm nhẹ trên tập tes >>> có thể là do dữ liệu test chứa những case khó phân loại.
+
+
+
+
+-- Kiểm tra nhầm lẫn giữa Iris-versicolor và Iris-virginica còn nhiều hay không?
+SELECT *
+FROM ML.CONFUSION_MATRIX(MODEL `project-leducthinh-2024.DA04_K300.iris_logistic_model_improved`);
+
+-- KQ:
+-- Iris-versicolor:
+-- Dự đoán đúng 42/43 (97.67%).
+-- Có 1 mẫu nhầm lẫn thành Iris-virginica.
+-- Vẫn còn một chút nhầm lẫn, nhưng kết quả tốt. >>> Tạm chấp nhận.
+
+
+
+-- B3: PREDICT
+SELECT *
+FROM ML.PREDICT(
+  MODEL `project-leducthinh-2024.DA04_K300.iris_logistic_model_improved`,
+  (
+    SELECT 
+      5.5 AS SepalLengthCm,
+      3.2 AS SepalWidthCm,
+      4.0 AS PetalLengthCm,
+      1.3 AS PetalWidthCm,
+      5.2 AS PetalArea
+  )
+);
+
+
+-- KQ từ predict:
+-- Loại hoa model dự đoán: Iris-versicolor
+
+-- Xác suất từng loại hoa:
+    -- Iris-versicolor: 86.43%
+    -- Iris-setosa: 12.86%
+    -- Iris-virginica: 0.71%
+
+-- Với xác suất 86.43%, mô hình rất tự tin rằng mẫu này thuộc lớp Iris-versicolor.
+-- Xác suất của các lớp khác (Iris-setosa và Iris-virginica) đều rất thấp >>> khả năng nhầm lẫn cũng nhỏ.
+
