@@ -1,0 +1,131 @@
+SELECT COUNT(*) FROM `project-leducthinh-2024.DA04_K300.titanic_train` 
+
+SELECT COUNT(*) FROM `project-leducthinh-2024.DA04_K300.titanic_test` 
+
+SELECT * FROM `project-leducthinh-2024.DA04_K300.titanic_train` LIMIT 5
+  -- "PassengerId": "180",
+  -- "Survived": "0",
+  -- "Pclass": "3",
+  -- "Name": "Leonard, Mr. Lionel",
+  -- "Sex": "male",
+  -- "Age": "36.0",
+  -- "SibSp": "0",
+  -- "Parch": "0",
+  -- "Ticket": "LINE",
+  -- "Fare": "0.0",
+  -- "Cabin": null,
+  -- "Embarked": "S"
+
+SELECT * FROM `project-leducthinh-2024.DA04_K300.titanic_test` LIMIT 5
+  -- "PassengerId": "1158",
+  -- "Pclass": "1",
+  -- "Name": "Chisholm, Mr. Roderick Robert Crispin",
+  -- "Sex": "male",
+  -- "Age": null,
+  -- "SibSp": "0",
+  -- "Parch": "0",
+  -- "Ticket": "112051",
+  -- "Fare": "0.0",
+  -- "Cabin": null,
+  -- "Embarked": "S"
+
+
+
+-- kiểm tra mất cân bằng
+
+  -- "Survived": "0",
+  -- "total": "549"
+
+  -- "Survived": "1",
+  -- "total": "342"
+
+-- >> Không mất cân bằng
+
+SELECT Survived, 
+COUNT (*) AS total
+FROM `project-leducthinh-2024.DA04_K300.titanic_train`
+GROUP BY Survived
+
+
+
+
+-- XÂY MODEL
+-- Aggregate Metrics
+-- Threshold 0.5000
+-- Precision 0.6935
+-- Recall 0.7963
+-- Accuracy 0.7794
+-- F1 score 0.7414
+-- Log loss 0.5071
+-- ROC AUC 0.8333
+
+CREATE OR REPLACE MODEL `project-leducthinh-2024.DA04_K300.titanic_train_logistic_model`
+OPTIONS(MODEL_TYPE = 'LOGISTIC_REG',
+        INPUT_LABEL_COLS =['Survived'],
+        AUTO_CLASS_WEIGHTS = TRUE)
+AS
+SELECT 
+  Survived,
+  Pclass,
+  Sex,
+  Age,
+  SibSp,
+  Parch,
+  Fare,
+  Embarked
+
+FROM `project-leducthinh-2024.DA04_K300.titanic_train`
+WHERE Age IS NOT NULL
+AND Embarked IS NOT NULL
+AND Survived IS NOT NULL
+
+
+
+
+-- EVALUATE
+
+SELECT *
+FROM ML.EVALUATE(MODEL  `project-leducthinh-2024.DA04_K300.titanic_train_logistic_model`)
+  -- "precision": "0.69354838709677424",
+  -- "recall": "0.79629629629629628",
+  -- "accuracy": "0.77941176470588236",
+  -- "f1_score": "0.74137931034482762",
+  -- "log_loss": "0.50706074213364927",
+  -- "roc_auc": "0.83330669330669327"
+
+SELECT *
+FROM ML.CONFUSION_MATRIX(MODEL  `project-leducthinh-2024.DA04_K300.titanic_train_logistic_model`)
+  -- "expected_label": "0",
+  -- "_0": "63",
+  -- "_1": "19"
+
+  -- "expected_label": "1",
+  -- "_0": "11",
+  -- "_1": "43"
+
+
+SELECT *
+FROM ML.ROC_CURVE(MODEL  `project-leducthinh-2024.DA04_K300.titanic_train_logistic_model`)
+
+
+
+
+
+-- PREDICT
+SELECT *
+FROM ML.PREDICT(MODEL `project-leducthinh-2024.DA04_K300.titanic_train_logistic_model`, 
+(  
+SELECT 
+  Pclass,
+  Sex,
+  Age,
+  SibSp,
+  Parch,
+  Fare,
+  Embarked
+
+FROM `project-leducthinh-2024.DA04_K300.titanic_test`
+WHERE Age IS NOT NULL
+AND Embarked IS NOT NULL
+))
+
